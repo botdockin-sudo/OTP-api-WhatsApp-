@@ -7,13 +7,15 @@ import makeWASocket, {
 } from "@whiskeysockets/baileys";
 import express from "express";
 import pino from "pino";
+import cors from "cors";
 
 const app = express();
+app.use(cors()); // Hopweb se connection ke liye zaroori
 const port = process.env.PORT || 10000;
 
 let sock;
 let isConnected = false;
-const verificationStore = new Map(); 
+const verificationStore = new Map(); // Bina database ke data yahan save hoga
 
 async function startWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
@@ -23,12 +25,13 @@ async function startWhatsApp() {
         auth: state,
         version: version,
         logger: pino({ level: 'silent' }),
-        browser: Browsers.ubuntu("Chrome"),
+        browser: Browsers.macOS("Desktop"),
         syncFullHistory: false
     });
 
     sock.ev.on('creds.update', saveCreds);
 
+    // MESSAGE RECEIVE LOGIC
     sock.ev.on('messages.upsert', async m => {
         const msg = m.messages[0];
         if (!msg.message || msg.key.fromMe) return;
@@ -43,8 +46,9 @@ async function startWhatsApp() {
             if (storedData && storedData.code === receivedCode) {
                 verificationStore.set(sender, { ...storedData, verified: true });
                 await sock.sendMessage(msg.key.remoteJid, { 
-                    text: "✅ Verification Successful!" 
+                    text: "✅ Mobile Number Verified! Website par wapas jayein." 
                 });
+                console.log(`Number ${sender} verified!`);
             }
         }
     });
@@ -53,7 +57,6 @@ async function startWhatsApp() {
         const { connection, lastDisconnect } = update;
         if (connection === 'close') {
             isConnected = false;
-            // Agar logout nahi hua hai toh reconnect karein
             if (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
                 setTimeout(startWhatsApp, 5000);
             }
@@ -64,6 +67,7 @@ async function startWhatsApp() {
     });
 }
 
+// 1. Link (Pair) karne ke liye
 app.get("/pair", async (req, res) => {
     let num = req.query.number;
     if (!num) return res.send("Number missing? ?number=91...");
@@ -75,16 +79,22 @@ app.get("/pair", async (req, res) => {
     } catch (err) { res.send(err.message); }
 });
 
+// 2. Website ke liye link generate karna
 app.get("/get-link", (req, res) => {
     const { number } = req.query;
     if (!number) return res.json({ error: "Number missing" });
     const cleanNumber = number.replace(/[^0-9]/g, '');
     const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
     verificationStore.set(cleanNumber, { code: randomCode, verified: false });
-    const waLink = `https://wa.me/919693521763?text=VERIFY-${randomCode}`;
+    
+    // Yahan apna bot number dalein
+    const botNumber = "919693521763"; 
+    const waLink = `https://wa.me/${botNumber}?text=VERIFY-${randomCode}`;
     res.json({ link: waLink });
 });
 
+// 3. Status check karne ke liye
 app.get("/status", (req, res) => {
     const { number } = req.query;
     const cleanNumber = number.replace(/[^0-9]/g, '');
@@ -93,10 +103,10 @@ app.get("/status", (req, res) => {
 });
 
 app.get("/", (req, res) => {
-    res.send(isConnected ? "Connected ✅" : "Not Connected ❌ /pair use karein");
+    res.send(isConnected ? "Connected ✅" : "Not Connected ❌");
 });
 
 app.listen(port, () => {
-    console.log(`Server on port ${port}`);
+    console.log(`Server started on port ${port}`);
     startWhatsApp();
 });
