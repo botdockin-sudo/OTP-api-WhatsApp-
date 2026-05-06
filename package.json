@@ -1,14 +1,15 @@
 {
-  "name": "whatsapp-otp-no-db",
+  "name": "whatsapp-otp-final",
   "version": "1.0.0",
+  "type": "module",
   "main": "index.js",
-  "type": "module", 
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "latest",
     "express": "^4.18.2",
-    "pino": "^8.14.1"
+    "pino": "^8.14.1",
+    "cors": "^2.8.5"
   }
 }
